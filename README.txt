@@ -18,6 +18,5 @@ Game Themes :
  --> classic
  --> epic
  --> gfunk
- --> retro
  --> metal
  --> chill
