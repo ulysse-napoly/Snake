@@ -50,7 +50,7 @@ blue = (50, 153, 213)
 blue_freeze = (0,0,255)
 
 snake_block = 20
-snake_speed = 10*difficulty
+
 
 display_width = 60*snake_block
 display_height = 40*snake_block
@@ -126,7 +126,7 @@ class Snake():
         self.magnet = 1
         self.control_variation = 1
         self.movement_variation = 1
-        if 'god' in game_mode:
+        if self.game.god_mode :
             self.state = 'invincible'
         else :
             self.state = 'normal'
@@ -162,7 +162,7 @@ class Snake():
         
     
     def check_edge_collision(self):
-        if 'infinity' in game_mode or 'invincible' in self.state:
+        if self.game.infinity_mode or 'invincible' in self.state:
             # Wrap around the screen for player 
             self.x %= display_width
             self.y %= display_height
@@ -227,7 +227,14 @@ class Food():
                      
 class SnakeGame():
     
-    def __init__(self):
+    def __init__(self, game_mode = "classic", difficulty=1):
+
+        self.infinity_mode = 'infinity' in game_mode
+        self.time_mode = 'time' in game_mode
+        self.god_mode = 'god' in game_mode
+        self.difficulty = difficulty
+        
+
         self.global_scores = {}
         self.global_scores["Black"] = 0
         self.global_scores["White"] = 0
@@ -246,12 +253,15 @@ class SnakeGame():
         self.init_game()
 
     def init_game(self):
-        
+        self.option_menu_open = False
+
         self.game_over = False
         self.game_ending = False
         self.winner = None
 
         self.foods = []
+
+        self.snake_speed = 10*self.difficulty
 
         self.init_powerups()
         self.init_players()
@@ -318,16 +328,16 @@ class SnakeGame():
 
     def show_game_timer(self,time_left):
         # Show time left if time mode activated 
-        if 'time' in game_mode:
+        if self.time_mode:
             font_style = pygame.font.SysFont(None, 80)
             time_to_print = max(0,int(time_left))
             timer_text = str(time_to_print).zfill(2)
             time = font_style.render(timer_text, True, red)
             dis.blit(time, (display_width//2, 30))
 
-    def message(self, msg, color):
+    def message(self, msg, color, y_offset = 0):
         mesg = self.font_end.render(msg, True, color)
-        dis.blit(mesg, [display_width / 4, display_height / 3])
+        dis.blit(mesg, [display_width / 4, display_height / 3 + y_offset])
 
     def draw_board(self):
         dis.fill(blue)
@@ -342,6 +352,62 @@ class SnakeGame():
                     pygame.draw.rect(dis, snake.color, [x[0], x[1], snake_block-1, snake_block-1])
             dis.blit(snake.head_ico, (snake.x-snake_block//2, snake.y-snake_block//2))
         
+    def option_menu_display(self, y = snake_block):
+        diff = str(int(self.difficulty*10)/10)
+        self.message("        Press I to toggle Infinity Edges : " + ("On" if self.infinity_mode else "Off"), red, y_offset=4*snake_block + y)
+        self.message("            Press T to toggle Time Mode : " + ("On" if self.time_mode else "Off"), red, y_offset=6*snake_block + y)
+        self.message("             Press G to toggle God Mode : " + ("On" if self.god_mode else "Off"), red, y_offset=8*snake_block + y)
+        self.message("    Press <- or -> to change difficulty : " + "  < "+(diff)+" >", red, y_offset=10*snake_block + y)
+        pygame.display.update()
+
+    def handle_option_inputs(self, event):
+        if self.option_menu_open and event.key == pygame.K_i:
+            self.infinity_mode = not self.infinity_mode
+        if self.option_menu_open and event.key == pygame.K_t:
+            self.time_mode = not self.time_mode
+        if self.option_menu_open and event.key == pygame.K_g:
+            self.god_mode = not self.god_mode
+        if self.option_menu_open and event.key == pygame.K_LEFT:
+            self.difficulty -= 0.5 if self.difficulty > 0.5 else 0
+        if self.option_menu_open and event.key == pygame.K_RIGHT:
+            self.difficulty += 0.5
+
+    def game_over_menu(self):
+        while self.game_ending:
+            dis.fill(blue)
+
+            self.message(self.winner+" Player Wins! Press E-Exit or C-Play Again", red)
+            self.message("   Press SPACEBAR to display game options", red, y_offset=2*snake_block)
+
+            self.show_scores(final=True)
+
+            if self.option_menu_open :
+                self.option_menu_display()
+
+            pygame.mixer.music.stop()
+            pygame.display.update()
+
+            events =  pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    self.game_over = True
+                    self.game_ending = False
+                    return 
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_e or event.key == pygame.K_ESCAPE:
+                        self.game_over = True
+                        self.game_ending = False
+                        return
+                    if event.key == pygame.K_c or event.key == pygame.K_RETURN:
+                        self.init_game()
+                        self.gameLoop()
+                    if event.key == pygame.K_SPACE:
+                        self.option_menu_open = not self.option_menu_open
+                    # Handle Options changes
+                    self.handle_option_inputs(event)
+                    
+                
+            clock.tick(30)
 
     def gameLoop(self):
 
@@ -362,7 +428,8 @@ class SnakeGame():
         
         # Set up timer 
         start_time = time.time()
-        max_time = 10*snake_block
+        # 60 seconds limit for time mode
+        max_time = 60*snake_block
 
         self.winner = ""
         while not self.game_over:
@@ -371,28 +438,7 @@ class SnakeGame():
                 if self.winner in self.global_scores.keys():
                     self.global_scores[self.winner] +=1
 
-                while self.game_ending:
-                    #dis.fill(blue)
-                    self.message(self.winner+" Player Wins! Press E-Exit or C-Play Again", red)
-
-                    self.show_scores(final=True)
-                    pygame.mixer.music.stop()
-                    pygame.display.update()
-
-                    events =  pygame.event.get()
-                    for event in events:
-                        if event.type == pygame.QUIT:
-                            self.game_over = True
-                            self.game_ending = False
-                            return 
-                        if event.type == pygame.KEYDOWN:
-                            if event.key == pygame.K_e:
-                                self.game_over = True
-                                self.game_ending = False
-                                return
-                            if event.key == pygame.K_c:
-                                self.init_game()
-                                self.gameLoop()
+                self.game_over_menu()
                             
             #print(self.game_ending)
             #print(" Handle events")
@@ -417,7 +463,7 @@ class SnakeGame():
                 self.powerup_name = self.powerup_type['name']
                 self.powerup_color = self.powerup_type['color']
                 self.powerup_icon = self.powerup_type['icon']
-                self.powerup_timer = self.powerup_type['duration'] * snake_speed
+                self.powerup_timer = self.powerup_type['duration'] * self.snake_speed
                 self.powerup_duration = self.powerup_type['duration'] 
 
             #print("Draw Board and Power Ups and apples")
@@ -481,7 +527,7 @@ class SnakeGame():
             max_time -= 1
             self.show_game_timer((max_time - (time.time()-start_time))//snake_block)
 
-            if (max_time - (time.time()-start_time)) <= 0 and 'time' in game_mode:
+            if (max_time - (time.time()-start_time)) <= 0 and self.time_mode:
                 if self.snake1.length > self.snake2.length :
                     self.winner = 'Black'
                 elif self.snake1.length < self.snake2.length :
@@ -555,11 +601,11 @@ class SnakeGame():
                     self.winner = "No"
                 self.game_ending = True
                 
-            clock.tick(snake_speed)
+            clock.tick(self.snake_speed)
 
             
 
         
-game = SnakeGame()
+game = SnakeGame(game_mode, difficulty)
 game.gameLoop()
 pygame.quit()
