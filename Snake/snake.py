@@ -34,9 +34,13 @@ pygame.init()
 
 
 
-#############################
-######### Graphics  #########
-#############################
+
+
+
+
+############################################################################################################
+############################################### Graphics ###################################################
+############################################################################################################
 white = (255, 255, 255)
 yellow =(255,255,0)
 grey = (100,100,100)
@@ -54,9 +58,8 @@ display_width = 60*snake_block
 display_height = 40*snake_block
 
 dis = pygame.display.set_mode((display_width, display_height))
-pygame.display.set_caption('Snake Game')
+pygame.display.set_caption('Snake Battle')
 clock = pygame.time.Clock()
-max_timer = 10
 
 def load_image(path, scale=1) : 
     return pygame.transform.scale(pygame.image.load(path), (snake_block*scale, snake_block*scale))
@@ -77,9 +80,12 @@ black_player_ico = load_image("graphics/python_ico.png", 2)
 white_player_ico = load_image("graphics/python_ico.png", 2)
 
 
-#############################
-######### Power-Ups #########
-#############################
+
+
+
+############################################################################################################
+############################################## Power-Ups ###################################################
+############################################################################################################
 powerup_list = [{'name': 'Invincible', 'color': grey, 'duration': 10, 'icon': shield_ico},
                  {'name': 'Speed Boost', 'color': yellow, 'duration': 7, 'icon': speed_ico},
                  {'name': 'Growth Multiplier', 'color': green_bonus, 'duration': 8, 'icon': growth_ico},
@@ -91,6 +97,14 @@ powerup_list = [{'name': 'Invincible', 'color': grey, 'duration': 10, 'icon': sh
 
 
 
+
+
+
+
+
+############################################################################################################
+############################################# Snake Class ##################################################
+############################################################################################################
 class Snake():
     def __init__(self, x, y, player_name, controls, game, ico, color):
         self.game = game
@@ -140,6 +154,11 @@ class Snake():
         # Update position
         self.x += self.movement_variation*self.x_change
         self.y += self.movement_variation*self.y_change
+        # Wrap around edges in infinity mode 
+        if self.game.infinity_mode or 'invincible' in self.state:
+            # Wrap around the screen for player 
+            self.x %= display_width
+            self.y %= display_height
         # Add head to body
         if self.movement_variation != 0 :
             self.head = [self.x, self.y]
@@ -159,15 +178,11 @@ class Snake():
         
     
     def check_edge_collision(self):
-        if self.game.infinity_mode or 'invincible' in self.state:
-            # Wrap around the screen for player 
-            self.x %= display_width
-            self.y %= display_height
-        else :
-            # Check for out of bounds for player (only in classic mode)
-            if self.is_out_of(display_width,display_height) :
-                self.game.game_ending = True
-                self.game.winner = 'Black' if self.player_name == 'White' else 'White'
+        # Check for out of bounds for player (only in classic mode)
+        if self.is_out_of(display_width,display_height) :
+            self.game.game_ending = True
+            self.game.winner = 'Black' if self.player_name == 'White' else 'White'
+            #self.game.players.remove(self)
             
     def check_body_collision(self):
         for snake in self.game.players :
@@ -175,6 +190,7 @@ class Snake():
                 if x == self.head and 'invincible' not in self.state :
                     self.game.game_ending = True
                     self.game.winner = 'Black' if self.player_name == 'White' else 'White'
+                    #self.game.players.remove(self)
         return
 
                         
@@ -212,6 +228,16 @@ class Snake():
                 snake.reset_power_up_variators()
             self.game.powerup_active = False 
 
+
+
+
+
+
+
+
+############################################################################################################
+############################################## Food Class ##################################################
+############################################################################################################     
 class Food():
     def __init__(self, game, points, ico): 
         self.x = round(random.randrange(0, display_width - snake_block) / snake_block) * snake_block
@@ -222,24 +248,40 @@ class Food():
         self.game = game
 
     def get_eaten(self, snake):
-        other_players_list = [enemy_snake for enemy_snake in self.game.players if snake != enemy_snake and "invincible" not in snake.state]
-        if self.points > 0 : 
-            self.exist = False
-            self.game.eating_sound.play()
-            snake.length += snake.growth_multiplier*self.points
-        elif len(other_players_list)>0 :
-            for adverse_snake in other_players_list : 
+        if abs(snake.x - self.x) < snake.magnet*snake_block and abs(snake.y - self.y) < snake.magnet*snake_block:
+            other_players_list = [enemy_snake for enemy_snake in self.game.players if enemy_snake != snake and "invincible" not in enemy_snake.state]
+            if self.points > 0 : 
                 self.exist = False
                 self.game.eating_sound.play()
-                adverse_snake.length += adverse_snake.growth_multiplier*self.points
-                adverse_snake.length = max(1, adverse_snake.length)
+                snake.length += snake.growth_multiplier*self.points
+            elif len(other_players_list)>0 :
+                for adverse_snake in other_players_list : 
+                    self.exist = False
+                    self.game.eating_sound.play()
+                    adverse_snake.length += adverse_snake.growth_multiplier*self.points
+                    adverse_snake.length = max(1, adverse_snake.length)
+                    
+
+
+
+
+
+
+
+
+############################################################################################################
+############################################## Game Class ##################################################
+############################################################################################################
                      
 class SnakeGame():
     
     def __init__(self, game_mode = "classic", difficulty_input=1, game_music_input = 'classic'):
+        
+        self.game_over = False
 
         self.infinity_mode = 'infinity' in game_mode
         self.time_mode = 'time' in game_mode
+        self.mistery_powerups = 'mist' in game_mode
         self.god_mode = 'god' in game_mode
         self.difficulty = difficulty_input
 
@@ -269,7 +311,6 @@ class SnakeGame():
     def init_game(self):
         self.option_menu_open = False
 
-        self.game_over = False
         self.game_ending = False
         self.winner = None
 
@@ -305,6 +346,7 @@ class SnakeGame():
         self.powerup_type = None
         self.powerup_color = None
         self.powerup_icon = None
+        self.mistery_icon = load_image("graphics/mistery_ico.png", 3)
         self.powerup_x = None
         self.powerup_y = None
         self.powerup_time = {}
@@ -360,6 +402,13 @@ class SnakeGame():
             timer_text = str(time_to_print).zfill(2)
             time = font_style.render(timer_text, True, red)
             dis.blit(time, (display_width//2, 30))
+            
+    def update_and_show_time(self):
+        self.max_time -= 1
+        self.show_game_timer((self.max_time - (time.time()-self.start_time))//self.snake_speed)
+
+        if (self.max_time - (time.time()-self.start_time)) <= 0 and self.time_mode:
+            self.select_winner_from_points()
     
     def select_winner_from_points(self):
         if self.snake1.length > self.snake2.length :
@@ -373,6 +422,26 @@ class SnakeGame():
     def message(self, msg, color, y_offset = 0):
         mesg = self.font_end.render(msg, True, color)
         dis.blit(mesg, [display_width / 4, display_height / 3 + y_offset])
+        
+    def spawn_powerup(self):
+        if not self.powerup_active and random.random() < self.powerup_chance:
+            # Spawn a random powerup on a random location
+            self.powerup_type = random.choice(self.powerup_types)
+            self.powerup_x = round(random.randrange(2*snake_block, display_width - 2*snake_block) / snake_block) * snake_block
+            self.powerup_y = round(random.randrange(2*snake_block, display_height - 2*snake_block) / snake_block) * snake_block
+            self.powerup_active = True
+            # Store powerup info befor it is eaten
+            self.powerup_name = self.powerup_type['name']
+            self.powerup_color = self.powerup_type['color']
+            self.powerup_icon = self.powerup_type['icon']
+            self.powerup_timer = self.powerup_type['duration'] * self.snake_speed
+            self.powerup_duration = self.powerup_type['duration'] 
+            
+    def update_powerup_time(self):
+        self.powerup_timer -= 1
+        if self.powerup_timer <= 0:
+            self.powerup_active = False
+            self.powerup_type = None
 
     def draw_board(self):
         dis.fill(blue)
@@ -380,26 +449,37 @@ class SnakeGame():
         #print(" draw food on the screen")
         for food in self.foods :
             dis.blit(food.ico, (food.x, food.y))
+            
+    def draw_powerup(self):
+        if self.mistery_powerups :
+            dis.blit(self.mistery_icon, (self.powerup_x-snake_block, self.powerup_y-snake_block))
+        else : 
+            dis.blit(self.powerup_icon, (self.powerup_x-snake_block, self.powerup_y-snake_block))
 
+            
     def draw_players(self):
         for snake in self.players :
             for x in snake.snake_list:
                     pygame.draw.rect(dis, snake.color, [x[0], x[1], snake_block-1, snake_block-1])
             dis.blit(snake.head_ico, (snake.x-snake_block//2, snake.y-snake_block//2))
         
+        
     def option_menu_display(self, y = snake_block):
         diff = str(int(self.difficulty*10)/10)
         self.message("        Press I to toggle Infinity Edges : " + ("On" if self.infinity_mode else "Off"), red, y_offset=4*snake_block + y)
-        self.message("            Press T to toggle Time Mode : " + ("On" if self.time_mode else "Off"), red, y_offset=6*snake_block + y)
-        self.message("             Press G to toggle God Mode : " + ("On" if self.god_mode else "Off"), red, y_offset=8*snake_block + y)
-        self.message("   Press <- or -> to change Difficulty : " + "  < "+(diff)+" >", red, y_offset=10*snake_block + y)
-        self.message("Press  Up or Down to change Music : " +(self.game_music), red, y_offset=12*snake_block + y)
+        self.message("        Press M to toggle Mistery Boxes : " + ("On" if self.mistery_powerups else "Off"), red, y_offset=6*snake_block + y)
+        self.message("            Press T to toggle Time Mode : " + ("On" if self.time_mode else "Off"), red, y_offset=8*snake_block + y)
+        self.message("             Press G to toggle God Mode : " + ("On" if self.god_mode else "Off"), red, y_offset=10*snake_block + y)
+        self.message("   Press <- or -> to change Difficulty : " + "  < "+(diff)+" >", red, y_offset=12*snake_block + y)
+        self.message("Press  Up or Down to change Music : " +(self.game_music), red, y_offset=14*snake_block + y)
         pygame.display.update()
 
     def handle_option_inputs(self, event):
         music_changed = False
         if self.option_menu_open and event.key == pygame.K_i:
             self.infinity_mode = not self.infinity_mode
+        if self.option_menu_open and event.key == pygame.K_m:
+            self.mistery_powerups = not self.mistery_powerups
         if self.option_menu_open and event.key == pygame.K_t:
             self.time_mode = not self.time_mode
         if self.option_menu_open and event.key == pygame.K_g:
@@ -422,7 +502,7 @@ class SnakeGame():
         music_changed = False
         return 
 
-    def game_over_menu(self):
+    def game_ending_menu(self):
         while self.game_ending:
             dis.fill(blue)
 
@@ -442,12 +522,10 @@ class SnakeGame():
                 if event.type == pygame.QUIT:
                     self.game_over = True
                     self.game_ending = False
-                    return 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_e or event.key == pygame.K_ESCAPE:
                         self.game_over = True
                         self.game_ending = False
-                        return
                     if event.key == pygame.K_c or event.key == pygame.K_RETURN:
                         self.init_game()
                         self.gameLoop()
@@ -466,9 +544,9 @@ class SnakeGame():
         pygame.mixer.music.set_volume(music_volume)
         
         # Set up timer 
-        start_time = time.time()
+        self.start_time = time.time()
         # 60 seconds limit for time mode
-        max_time = 60*self.snake_speed
+        self.max_time = 60*self.snake_speed
 
         self.winner = ""
 
@@ -477,77 +555,76 @@ class SnakeGame():
             if self.game_ending :
                 if self.winner in self.global_scores.keys():
                     self.global_scores[self.winner] +=1
-
-                self.game_over_menu()
+                
+                # Diplay endgame menu
+                self.game_ending_menu()
+                
+                # Check for quit event 
+                if self.game_over : 
+                    break
                             
-            #print(" Handle events")
+            # Handle events
             events = [event for event in pygame.event.get() if event.type == pygame.QUIT or event.type == pygame.KEYDOWN]
             for event in events:
                 if event.type == pygame.QUIT:
                     self.game_over = True
+                    
+            # Catch players inputs       
             for snake in self.players : 
                 snake.handle_events(events)
                 
             
                         
             
-            #print("Power ups")
-            if not self.powerup_active and random.random() < self.powerup_chance:
-                # Spawn a random powerup on a random location
-                self.powerup_type = random.choice(self.powerup_types)
-                self.powerup_x = round(random.randrange(2*snake_block, display_width - 2*snake_block) / snake_block) * snake_block
-                self.powerup_y = round(random.randrange(2*snake_block, display_height - 2*snake_block) / snake_block) * snake_block
-                self.powerup_active = True
-                # Store powerup info befor it is eaten
-                self.powerup_name = self.powerup_type['name']
-                self.powerup_color = self.powerup_type['color']
-                self.powerup_icon = self.powerup_type['icon']
-                self.powerup_timer = self.powerup_type['duration'] * self.snake_speed
-                self.powerup_duration = self.powerup_type['duration'] 
+            # Spawn Power up if not active
+            self.spawn_powerup()
 
-            #print("Draw Board and Power Ups and apples")
+            # Draw Board and apples
             self.draw_board()
 
-            #print("Snakes Moving")
+            # Snakes Moving
             for snake in self.players :
                 snake.move()
+                
+            self.draw_players()
 
+            # Check for snakes death
             for snake in self.players :
                 snake.check_edge_collision()
             
             for snake in self.players :
                 snake.check_body_collision()
             
-            self.draw_players()
+            # Eat foods
+            for food in self.foods:
+                for snake in game.players :
+                    food.get_eaten(snake)
+
+                if not food.exist:
+                    points = food.points
+                    ico = food.ico
+                    self.foods.remove(food)
+                    self.foods.append(Food(self, points, ico))
             
-            # Update 
-            max_time -= 1
-            self.show_game_timer((max_time - (time.time()-start_time))//self.snake_speed)
+            self.update_and_show_time()
+            
+            
 
-            if (max_time - (time.time()-start_time)) <= 0 and self.time_mode:
-                self.select_winner_from_points()
-
-
-            #print(self.game_ending)
-            #print(" handle power ups")
-            #if self.powerup_active and self.powerup_type != None:
-            #    pygame.draw.rect(dis, self.powerup_type['color'], [self.powerup_x, self.powerup_y, snake_block, snake_block])
+            # Handle power ups
             if self.powerup_active and self.powerup_type != None:
-                dis.blit(self.powerup_icon, (self.powerup_x-snake_block, self.powerup_y-snake_block))
-                self.powerup_timer -= 1
-                if self.powerup_timer <= 0:
-                    self.powerup_active = False
-                    self.powerup_type = None
+                self.draw_powerup()
+                
+                self.update_powerup_time()
 
                 for snake in self.players :
                     snake.eat_powerup()
 
-            # check power-up effect duration for player 1
+            # Check power-up effect duration
             for snake in self.players :
                 snake.check_powerup_duration()
                 
 
-            # show power-up timer if active
+            # Show power-up timer if active
             for snake in self.players :
                 if self.powerup_active and self.powerup_time[snake.player_name] is not None:
                     self.show_timer(snake,
@@ -558,36 +635,26 @@ class SnakeGame():
 
             # Update scores
             self.show_scores()
-
-            #print(self.game_ending)
-            #print(" update display")
+            
+            # Update display
             pygame.display.update()
             
-            #print(self.game_ending)
-            
-            for food in self.foods:
-                for snake in game.players :
-                    if abs(snake.x - food.x) < snake.magnet*snake_block and abs(snake.y - food.y) < snake.magnet*snake_block:
-                        food.get_eaten(snake)
-
-                if not food.exist:
-                    points = food.points
-                    ico = food.ico
-                    self.foods.remove(food)
-                    self.foods.append(Food(self, points, ico))
 
 
-            #print(self.game_ending)
-            #print(self.snake1.state, self.snake2.state)
-            #print(" check for collision between snake heads")
+            # Check for collision between snake heads
             if self.snake1.x == self.snake2.x and self.snake1.y == self.snake2.y and 'invincible' not in self.snake1.state  and 'invincible' not in self.snake2.state :
                 self.select_winner_from_points()
                 
+            # Limit FPS according to game difficulty 
             clock.tick(self.snake_speed)
-
             
-
+       
+            
         
-game = SnakeGame(game_mode, difficulty, game_music_name)
-game.gameLoop()
-pygame.quit()
+        
+        
+
+if __name__ == "__main__":       
+    game = SnakeGame(game_mode, difficulty, game_music_name)
+    game.gameLoop()
+    pygame.quit()
