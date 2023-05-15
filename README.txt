@@ -5,6 +5,7 @@ launch with "python snake.py [game mode] [difficulty] [theme] [music volume]"
 
 Game Modes : 
  --> infinity : Wrap around edges
+ --> mist : Surprise PowerUps 
  --> time : Become as long as possible in 60 seconds
  --> god : Be invincible 
  
