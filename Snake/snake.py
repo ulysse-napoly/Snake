@@ -70,6 +70,11 @@ growth_ico = load_image("graphics/growth_ico.png", 3)
 magnet_ico = load_image("graphics/magnet_ico.png", 3)
 reverse_ico = load_image("graphics/reverse_ico.png", 3)
 freeze_ico = load_image("graphics/freeze_ico.png", 3)
+flame_ico = load_image("graphics/flame_ico.png", 3)
+laser_ico = load_image("graphics/laser_ico.png", 3)
+
+flame_trace_ico = load_image("graphics/flame_ico.png", 2)
+# FLAME
 
 pommeV_ico = load_image("graphics/pommeV_ico.png")
 pommeR_ico = load_image("graphics/pommeR_ico.png")
@@ -87,11 +92,14 @@ white_player_ico = load_image("graphics/python_ico.png", 2)
 ############################################## Power-Ups ###################################################
 ############################################################################################################
 powerup_list = [{'name': 'Invincible', 'color': grey, 'duration': 10, 'icon': shield_ico},
+                 {'name': 'Reverse', 'color': purple, 'duration': 5, 'icon': reverse_ico},
+                 {'name': 'Freeze', 'color': blue_freeze, 'duration': 5, 'icon': freeze_ico},
                  {'name': 'Speed Boost', 'color': yellow, 'duration': 7, 'icon': speed_ico},
                  {'name': 'Growth Multiplier', 'color': green_bonus, 'duration': 8, 'icon': growth_ico},
                  {'name': 'Magnet', 'color': red, 'duration': 10, 'icon': magnet_ico},
-                 {'name': 'Reverse', 'color': purple, 'duration': 5, 'icon': reverse_ico},
-                 {'name': 'Freeze', 'color': blue_freeze, 'duration': 5, 'icon': freeze_ico}]
+                 {'name': 'Flame', 'color': red, 'duration': 10, 'icon': flame_ico},
+                 {'name': 'Lasers', 'color': green1, 'duration': 7, 'icon': laser_ico}]
+                # FLAME
 
 
 
@@ -127,6 +135,9 @@ class Snake():
         self.magnet = 1
         self.control_variation = 1
         self.movement_variation = 1
+        self.flame_trace = 0
+        self.lasers = 0
+        # FLAME
         if self.game.god_mode :
             self.state = 'invincible'
         else :
@@ -164,19 +175,13 @@ class Snake():
             self.head = [self.x, self.y]
             self.snake_list.append(self.head)
         # Delete extra Tail Blocks
-        while len(self.snake_list) > self.length:
+        while len(self.snake_list) > self.length *(1 + self.flame_trace):
                 del self.snake_list[0]
-
-        
-    
-    def check_len(self):
-        while len(self.snake1.snake_list) > self.snake1.length:
-                    del self.snake1.snake_list[0]
+                # FLAME
 
     def is_out_of(self, x_max, y_max):
         return self.x >= x_max or self.x < 0 or self.y >= y_max or self.y < 0
-        
-    
+           
     def check_edge_collision(self):
         # Check for out of bounds for player (only in classic mode)
         if self.is_out_of(display_width,display_height) :
@@ -192,10 +197,7 @@ class Snake():
                     self.game.winner = 'Black' if self.player_name == 'White' else 'White'
                     #self.game.players.remove(self)
         return
-
-                        
-                        
-        
+     
     def eat_powerup(self):
         other_players_list = [snake for snake in self.game.players if snake != self]
         if abs(self.x - self.game.powerup_x) < self.magnet*2*snake_block and abs(self.y - self.game.powerup_y) < self.magnet*2*snake_block and self.game.powerup_active:
@@ -212,6 +214,11 @@ class Snake():
                         self.growth_multiplier = 3
                     elif self.game.powerup_type['name'] == 'Magnet':
                         self.magnet = 5
+                    elif self.game.powerup_type['name'] == 'Flame':
+                        self.flame_trace = 1
+                        # FLAME
+                    elif self.game.powerup_type['name'] == 'Lasers':
+                        self.lasers = 1
                     elif self.game.powerup_type['name'] == 'Reverse':
                         for adverse_snake in other_players_list:
                             adverse_snake.control_variation *= -1
@@ -226,13 +233,66 @@ class Snake():
         if self.game.powerup_time[self.player_name] is not None and time.time() - self.game.powerup_time[self.player_name] >= self.game.powerup_duration:
             for snake in self.game.players :
                 snake.reset_power_up_variators()
+            self.game.laser_list = []
             self.game.powerup_active = False 
 
 
+############################################################################################################
+############################################## Laser Class ##################################################
+############################################################################################################     
+class Laser():
+    def __init__(self, game, x, y, direction): 
+        self.x = x
+        self.y = y
+        self.direction = direction
+        self.speed = 2
+        self.length = 2
+        self.dots = []
+        self.game = game
+        
+ 
+    def move(self):
+        # Update position
+        for i in range(self.speed):
+            self.x += self.direction[0]
+            self.y += self.direction[1]
+            # Add dot to laser
+            if not self.check_edge_collision():
+                self.dots.append([self.x, self.y])
+            else :
+                self.dots=[]
+        # Delete extra laser Blocks
+        while len(self.dots) > self.length:
+            del self.dots[0]
+     
+    def is_out_of(self, x_max, y_max):
+        return self.x >= x_max or self.x < 0 or self.y >= y_max or self.y < 0
+           
+    def check_edge_collision(self):
+        # Check for out of bounds for laser
+        if self.is_out_of(display_width,display_height) :
+            return True
 
-
-
-
+    def check_snake_collision(self):
+        body_malus = 1
+        head_malus = 5
+        for snake in self.game.players :
+            # Lose body_malus point if collision with body
+            for i,x in enumerate(snake.snake_list[:-1]):
+                if x in self.dots and snake.lasers!=1 :
+                    snake.length = max(snake.length-body_malus, 1)
+                    self.game.laser_impact_sound.play()
+                    print("Snake : ", snake.snake_list)
+                    print("Dots : ", self.dots)
+                    print("Block : ", i)
+            # Lose head_malus points if collision with enemy head 
+            if snake.snake_list[-1] in self.dots and snake.lasers!=1  :
+                snake.length = max(snake.length-head_malus, 1)
+                self.game.laser_impact_sound.play()
+                print("Snake : ", snake.snake_list)
+                print("Dots : ", self.dots)
+                print("Block : ", "Last")
+        return
 
 
 ############################################################################################################
@@ -262,13 +322,6 @@ class Food():
                     adverse_snake.length = max(1, adverse_snake.length)
                     
 
-
-
-
-
-
-
-
 ############################################################################################################
 ############################################## Game Class ##################################################
 ############################################################################################################
@@ -279,7 +332,7 @@ class SnakeGame():
         
         self.game_over = False
 
-        self.infinity_mode = 'infinity' in game_mode
+        self.infinity_mode = True
         self.time_mode = 'time' in game_mode
         self.mistery_powerups = 'mist' in game_mode
         self.god_mode = 'god' in game_mode
@@ -297,6 +350,11 @@ class SnakeGame():
                 
         self.eating_sound = mixer.Sound('sounds/crunch.wav')
         self.powerup_sound = mixer.Sound('sounds/powerup.wav')
+        self.laser_impact_sound = mixer.Sound('sounds/laser.wav')
+        self.laser_impact_sound.set_volume(0.4)
+        self.laser_sound = mixer.Sound('sounds/laser_impact.wav')
+        self.laser_impact_sound.set_volume(0.4)
+        
 
         self.font_end = pygame.font.SysFont(None, 40)
         self.font_win = pygame.font.SysFont(None, 40)
@@ -338,6 +396,7 @@ class SnakeGame():
 
     def init_powerups(self):
         self.powerup_types = powerup_list
+        self.laser_list = []
         self.powerup_chance = 0.05
         self.powerup_timer = 0
         self.powerup_name = ''
@@ -455,13 +514,43 @@ class SnakeGame():
             dis.blit(self.mistery_icon, (self.powerup_x-snake_block, self.powerup_y-snake_block))
         else : 
             dis.blit(self.powerup_icon, (self.powerup_x-snake_block, self.powerup_y-snake_block))
-
-            
+     
     def draw_players(self):
         for snake in self.players :
-            for x in snake.snake_list:
-                    pygame.draw.rect(dis, snake.color, [x[0], x[1], snake_block-1, snake_block-1])
+            if snake.flame_trace == 0 :
+                for x in snake.snake_list:
+                        pygame.draw.rect(dis, snake.color, [x[0], x[1], snake_block-1, snake_block-1])
+            else :
+                for x in snake.snake_list[len(snake.snake_list)-snake.length:]:
+                        pygame.draw.rect(dis, snake.color, [x[0], x[1], snake_block-1, snake_block-1])
+                # Draw flame traces if present 
+                for x in snake.snake_list[:len(snake.snake_list)-snake.length]:
+                        dis.blit(flame_trace_ico, (x[0]-snake_block//2, x[1]-snake_block))
+            # FLAME
             dis.blit(snake.head_ico, (snake.x-snake_block//2, snake.y-snake_block//2))
+
+    def draw_lasers(self):
+        for laser in self.laser_list :
+            for x in laser.dots:
+                D_x = (snake_block//5)*abs(laser.direction[1])//snake_block
+                D_y = (snake_block//5)*abs(laser.direction[0])//snake_block
+                pygame.draw.rect(dis, green1, [x[0]+D_x, x[1]+D_y, snake_block-2*D_x, snake_block-2*D_y])
+        
+    def shoot_lasers(self):
+        for snake in self.players :
+            if snake.lasers==1 : 
+                if self.frame_count%4 == 0 :
+                    dir = [snake.x_change, snake.y_change]
+                    self.laser_list.append(Laser(self, snake.head[0], snake.head[1], dir))
+                    self.laser_sound.play()
+
+    def handle_lasers(self):
+        for i,laser in enumerate(self.laser_list):
+            laser.move()
+            if laser.check_edge_collision():
+                self.laser_list.pop(i)
+            laser.check_snake_collision()
+
         
         
     def option_menu_display(self, y = snake_block):
@@ -547,10 +636,15 @@ class SnakeGame():
         self.start_time = time.time()
         # 60 seconds limit for time mode
         self.max_time = 60*self.snake_speed
+        # Count frames for some timed effects (lasers)
+        self.frame_count = 0
 
         self.winner = ""
 
         while not self.game_over:
+
+            self.frame_count += 1
+
             # If game has ended, add winner score
             if self.game_ending :
                 if self.winner in self.global_scores.keys():
@@ -581,13 +675,15 @@ class SnakeGame():
 
             # Draw Board and apples
             self.draw_board()
-
             # Snakes Moving
             for snake in self.players :
                 snake.move()
+            
+            self.shoot_lasers()
+            self.handle_lasers()
                 
             self.draw_players()
-
+            self.draw_lasers()
             # Check for snakes death
             for snake in self.players :
                 snake.check_edge_collision()
