@@ -91,14 +91,15 @@ white_player_ico = load_image("graphics/python_ico.png", 2)
 ############################################################################################################
 ############################################## Power-Ups ###################################################
 ############################################################################################################
-powerup_list = [{'name': 'Invincible', 'color': grey, 'duration': 10, 'icon': shield_ico},
+powerup_list = [{'name': 'Magnet', 'color': red, 'duration': 10, 'icon': magnet_ico},
+                 {'name': 'Flame', 'color': red, 'duration': 10, 'icon': flame_ico},
+                 {'name': 'Lasers', 'color': green1, 'duration': 7, 'icon': laser_ico},
+                 {'name': 'Invincible', 'color': grey, 'duration': 10, 'icon': shield_ico},
                  {'name': 'Reverse', 'color': purple, 'duration': 5, 'icon': reverse_ico},
                  {'name': 'Freeze', 'color': blue_freeze, 'duration': 5, 'icon': freeze_ico},
                  {'name': 'Speed Boost', 'color': yellow, 'duration': 7, 'icon': speed_ico},
-                 {'name': 'Growth Multiplier', 'color': green_bonus, 'duration': 8, 'icon': growth_ico},
-                 {'name': 'Magnet', 'color': red, 'duration': 10, 'icon': magnet_ico},
-                 {'name': 'Flame', 'color': red, 'duration': 10, 'icon': flame_ico},
-                 {'name': 'Lasers', 'color': green1, 'duration': 7, 'icon': laser_ico}]
+                 {'name': 'Growth Multiplier', 'color': green_bonus, 'duration': 8, 'icon': growth_ico}
+                 ]
                 # FLAME
 
 
@@ -282,16 +283,16 @@ class Laser():
                 if x in self.dots and snake.lasers!=1 :
                     snake.length = max(snake.length-body_malus, 1)
                     self.game.laser_impact_sound.play()
-                    print("Snake : ", snake.snake_list)
-                    print("Dots : ", self.dots)
-                    print("Block : ", i)
+                    #print("Snake : ", snake.snake_list)
+                    #print("Dots : ", self.dots)
+                    #print("Block : ", i)
             # Lose head_malus points if collision with enemy head 
             if snake.snake_list[-1] in self.dots and snake.lasers!=1  :
                 snake.length = max(snake.length-head_malus, 1)
                 self.game.laser_impact_sound.play()
-                print("Snake : ", snake.snake_list)
-                print("Dots : ", self.dots)
-                print("Block : ", "Last")
+                #print("Snake : ", snake.snake_list)
+                #print("Dots : ", self.dots)
+                #print("Block : ", "Last")
         return
 
 
